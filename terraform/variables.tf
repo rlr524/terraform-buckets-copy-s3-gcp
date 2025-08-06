@@ -7,5 +7,5 @@ variable "gcp_project" {
 variable "aws_s3_bucket" {
   description = "The S3 bucket being copied to GCP"
   type        = string
-  default     = "emiya-todo-service-files-dev"
+  default     = "emiya-todo-service-files-dev-aug-fifth"
 }
