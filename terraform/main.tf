@@ -3,7 +3,7 @@ provider "aws" {
 }
 
 provider "google" {
-  project = "emiya-todo-list"
+  project = var.gcp_project
   region  = "us-west1"
 }
 
@@ -26,7 +26,7 @@ resource "aws_iam_role" "s3_access_role" {
 }
 
 resource "aws_iam_policy" "s3_access_policy" {
-  name        = "emiya-todo-s3-access-policy-dev-aug-fifth"
+  name        = "emiya-todo-s3-access-policy-dev"
   description = "Allow List, Get, and Put on emiya-todo-service-files-dev bucket"
   policy = jsonencode({
     Version = "2012-10-17"
@@ -54,7 +54,7 @@ resource "aws_iam_role_policy_attachment" "attach_policy" {
 }
 
 resource "aws_iam_role" "google_web_identity_role" {
-  name = "emiya-todo-google-web-identity-role-dev-aug-fifth"
+  name = "emiya-todo-google-web-identity-role-dev"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -66,7 +66,7 @@ resource "aws_iam_role" "google_web_identity_role" {
       Action = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = {
-          "accounts.google.com:sub" : "115656257329086782558"
+          "accounts.google.com:sub" : "103967322006652893306"
         }
       }
     }]
@@ -78,9 +78,22 @@ resource "aws_iam_role_policy_attachment" "attach_policy_web_identity_role" {
   policy_arn = aws_iam_policy.s3_access_policy.arn
 }
 
+data "google_storage_transfer_project_service_account" "default" {
+  project = var.gcp_project
+}
+
 resource "google_storage_bucket" "emiya_todo_service_files_from_s3_dev" {
-  name     = "emiya-todo-service-files-from-s3-dev-aug-fifth"
-  location = "US"
+  name          = var.gcp_storage_bucket
+  storage_class = "STANDARD"
+  project       = var.gcp_project
+  location      = "US"
+}
+
+resource "google_storage_bucket_iam_member" "s3_copy_bucket" {
+  bucket     = google_storage_bucket.emiya_todo_service_files_from_s3_dev.name
+  role       = "roles/storage.admin"
+  member     = "serviceAccount:${data.google_storage_transfer_project_service_account.default.email}"
+  depends_on = [google_storage_bucket.emiya_todo_service_files_from_s3_dev]
 }
 
 resource "google_iam_workload_identity_pool" "aws_pool" {
@@ -131,6 +144,7 @@ resource "google_storage_transfer_job" "s3-bucket-nightly-copy-to-gcp-storage" {
     }
     repeat_interval = "86400s"
   }
-}
 
+  depends_on = [ google_storage_bucket.emiya_todo_service_files_from_s3_dev, google_storage_bucket_iam_member.s3_copy_bucket ]
+}
 
